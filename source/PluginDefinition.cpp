@@ -122,20 +122,20 @@ const TCHAR *ascii2HexSpace = TEXT("insertSpace");
 const TCHAR *ascii2HexMaj = TEXT("uppercase");
 const TCHAR *ascii2HexNbCharPerLine = TEXT("nbCharPerLine");
 
-void getCmdsFromConf(const TCHAR *confPath, Param & param)
+void getCmdsFromConf(const TCHAR *pConfPath, Param & _param)
 {
 	TCHAR cmdNames[MAX_PATH];
-	::GetPrivateProfileSectionNames(cmdNames, MAX_PATH, confPath);
+	::GetPrivateProfileSectionNames(cmdNames, MAX_PATH, pConfPath);
 	TCHAR *pFn = cmdNames;
 
 	if (*pFn && wcscmp(pFn, ascii2HexSectionName) == 0)
 	{
-		int val = GetPrivateProfileInt(pFn, ascii2HexSpace, 0, confPath);
-		param._insertSpace = val != 0;
-		val = GetPrivateProfileInt(pFn, ascii2HexMaj, 0, confPath);
-		param._isMaj = val != 0;
-		val = GetPrivateProfileInt(pFn, ascii2HexNbCharPerLine, 0, confPath);
-		param._nbCharPerLine = val;
+		int val = GetPrivateProfileInt(pFn, ascii2HexSpace, 0, pConfPath);
+		_param._insertSpace = val != 0;
+		val = GetPrivateProfileInt(pFn, ascii2HexMaj, 0, pConfPath);
+		_param._isMaj = val != 0;
+		val = GetPrivateProfileInt(pFn, ascii2HexNbCharPerLine, 0, pConfPath);
+		_param._nbCharPerLine = val;
 	}
 }
 // 
@@ -266,7 +266,9 @@ bool HexString::toAscii()
 {
 	size_t l = length();
 	bool hasWs = false;
+	int zeroX = 0;
 	if (!l || l < 2) return false;
+	if (_str[0] == '0' && (_str[1] == 'x' || _str[1] == 'X')) zeroX = 2; // check if string begins with 0x
 	if (l < 5)	//3 :  "00X" or "X00" where X == \n or " "
 				//4 :  "0000"
 	{
@@ -275,11 +277,12 @@ bool HexString::toAscii()
 	// Check 5 first characters
 	else // 5: "00 00" or "00000"
 	{
-		hasWs = _str[2] == ' ';
+		hasWs = _str[2 + zeroX] == ' ' || _str[2] == ' '; // 0xAA BB CC or 0x AA BB CC
+		if (_str[2] == ' ' && zeroX) zeroX++; // 0x AA BB CC
 	}
 	// Begin conversion
 	hexStat stat = st_init;
-	size_t i = 0, j = 0;
+	size_t i = 0 + zeroX, j = 0;
 	for ( ; _str[i] ; i++)
 	{
 		if (_str[i] == ' ')
@@ -421,8 +424,10 @@ void ascii2hex(bool insertSpace, bool isMaj, size_t nbCharPerLine)
 	pDestText[j] = 0x00;
 
 	size_t start = selText.getSelStartPos();
+	::SendMessage(hCurrScintilla, SCI_BEGINUNDOACTION, 0, 0);
 	::SendMessage(hCurrScintilla, SCI_REPLACESEL, 0, (LPARAM)"");
 	::SendMessage(hCurrScintilla, SCI_ADDTEXT, j, (LPARAM)pDestText);
+	::SendMessage(hCurrScintilla, SCI_ENDUNDOACTION, 0, 0);
 	::SendMessage(hCurrScintilla, SCI_SETSEL, start, start+j);
 
 	delete [] pDestText;
@@ -442,8 +447,10 @@ void hex2Ascii()
 		HWND hCurrScintilla = getCurrentScintillaHandle();
 		size_t start = transformer.getSelStartPos();
 		size_t len = transformer.length();
+		::SendMessage(hCurrScintilla, SCI_BEGINUNDOACTION, 0, 0);
 		::SendMessage(hCurrScintilla, SCI_REPLACESEL, 0, (LPARAM)"");
 		::SendMessage(hCurrScintilla, SCI_ADDTEXT, len, (LPARAM)hexStr);
+		::SendMessage(hCurrScintilla, SCI_ENDUNDOACTION, 0, 0);
 		::SendMessage(hCurrScintilla, SCI_SETSEL, start, start+len);
 	}
 	else
